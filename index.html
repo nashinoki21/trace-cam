@@ -60,20 +60,36 @@
     transform-origin: 0 0;
     will-change: transform;
   }
-  #pick {
+  #toolbar {
     position: fixed;
-    left: 50%;
-    bottom: calc(env(safe-area-inset-bottom) + 16px);
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px calc(env(safe-area-inset-right) + 12px)
+      calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 12px);
+    background: rgba(0, 0, 0, 0.6);
+  }
+  #opacity {
+    display: block;
+    width: 100%;
+    height: 44px;
+    margin: 0;
+  }
+  #toolbar .buttons {
+    display: flex;
+    gap: 8px;
+  }
+  #toolbar button {
+    flex: 1;
     min-height: 44px;
-    padding: 12px 24px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.85);
     color: #000;
     font: inherit;
-    font-size: 17px;
+    font-size: 15px;
   }
+  #toolbar button:disabled, #opacity:disabled { opacity: 0.4; }
   #version {
     position: fixed;
     top: calc(env(safe-area-inset-top) + 4px);
@@ -85,7 +101,7 @@
     position: fixed;
     left: calc(env(safe-area-inset-left) + 8px);
     right: calc(env(safe-area-inset-right) + 8px);
-    bottom: calc(env(safe-area-inset-bottom) + 8px);
+    top: calc(env(safe-area-inset-top) + 44px);
     padding: 8px;
     background: rgba(0, 0, 0, 0.7);
     font: 11px ui-monospace, monospace;
@@ -98,13 +114,21 @@
 <body>
 <video id="video" playsinline muted autoplay></video>
 <div id="layer" hidden><canvas id="overlay"></canvas></div>
-<button id="pick" hidden>Choose image</button>
+<div id="toolbar" hidden>
+  <input id="opacity" type="range" min="0.05" max="1" step="0.01" value="0.5" aria-label="Opacity" disabled>
+  <div class="buttons">
+    <button id="flip" disabled>Flip</button>
+    <button id="reset" disabled>Reset</button>
+    <button id="pick">Image</button>
+    <button id="lock" disabled>Lock</button>
+  </div>
+</div>
 <input id="file" type="file" accept="image/*" hidden>
 <div id="start">
   <button id="startButton">Start camera</button>
   <div id="message"></div>
 </div>
-<div id="version">v0.3.0</div>
+<div id="version">v0.4.0</div>
 <div id="debug" hidden></div>
 <script>
 const video = document.getElementById("video");
@@ -151,7 +175,7 @@ async function startCamera() {
   video.srcObject = stream;
   video.play().catch(() => {});
   startScreen.hidden = true;
-  pickButton.hidden = false;
+  toolbar.hidden = false;
   if (!debugEl.hidden) showDebug();
 }
 
@@ -174,6 +198,10 @@ document.addEventListener("visibilitychange", () => {
 
 const layer = document.getElementById("layer");
 const overlay = document.getElementById("overlay");
+const toolbar = document.getElementById("toolbar");
+const opacityInput = document.getElementById("opacity");
+const flipButton = document.getElementById("flip");
+const resetButton = document.getElementById("reset");
 const pickButton = document.getElementById("pick");
 const fileInput = document.getElementById("file");
 const MAX_SIDE = 2048;
@@ -255,7 +283,25 @@ for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
   document.addEventListener(type, (e) => e.preventDefault());
 }
 
+function resetTransform() {
+  state.x = window.innerWidth / 2;
+  state.y = window.innerHeight / 2;
+  state.scale = window.innerWidth / overlay.width;
+  state.rotation = 0;
+  state.flipX = false;
+  render();
+}
+
 pickButton.addEventListener("click", () => fileInput.click());
+resetButton.addEventListener("click", resetTransform);
+flipButton.addEventListener("click", () => {
+  state.flipX = !state.flipX;
+  render();
+});
+opacityInput.addEventListener("input", () => {
+  state.opacity = Number(opacityInput.value);
+  render();
+});
 
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files[0];
@@ -280,12 +326,9 @@ fileInput.addEventListener("change", async () => {
   ctx.drawImage(img, 0, 0, overlay.width, overlay.height);
   URL.revokeObjectURL(url);
 
-  state.x = window.innerWidth / 2;
-  state.y = window.innerHeight / 2;
-  state.scale = window.innerWidth / overlay.width;
-  state.rotation = 0;
-  render();
+  resetTransform();
   layer.hidden = false;
+  opacityInput.disabled = flipButton.disabled = resetButton.disabled = false;
 });
 
 function showDebug() {
