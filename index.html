@@ -108,6 +108,26 @@
     white-space: pre-wrap;
     word-break: break-all;
   }
+  #unlock {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 4px);
+    left: calc(env(safe-area-inset-left) + 4px);
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 22px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+  /* Fills over the 600 ms hold so you can see the unlock coming. */
+  #unlock.pressing {
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
+    transition: background 0.6s linear;
+  }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -128,7 +148,8 @@
   <button id="startButton">Start camera</button>
   <div id="message"></div>
 </div>
-<div id="version">v0.4.0</div>
+<button id="unlock" hidden aria-label="Hold to unlock">Hold</button>
+<div id="version">v0.5.0</div>
 <div id="debug" hidden></div>
 <script>
 const video = document.getElementById("video");
@@ -229,6 +250,7 @@ function render() {
 // fingers and state, so the image never jumps when the finger count changes.
 const pointers = new Map();
 let anchor = null;
+let locked = false;
 
 function reanchor() {
   const pts = [...pointers.values()];
@@ -236,6 +258,7 @@ function reanchor() {
 }
 
 layer.addEventListener("pointerdown", (e) => {
+  if (locked) return;
   layer.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   reanchor();
@@ -328,7 +351,40 @@ fileInput.addEventListener("change", async () => {
 
   resetTransform();
   layer.hidden = false;
-  opacityInput.disabled = flipButton.disabled = resetButton.disabled = false;
+  opacityInput.disabled = flipButton.disabled = resetButton.disabled = lockButton.disabled = false;
+});
+
+const lockButton = document.getElementById("lock");
+const unlockButton = document.getElementById("unlock");
+
+lockButton.addEventListener("click", () => {
+  locked = true;
+  pointers.clear();
+  toolbar.hidden = true;
+  unlockButton.hidden = false;
+});
+
+function onLongPress(el, action) {
+  let timer = null;
+  el.addEventListener("pointerdown", () => {
+    el.classList.add("pressing");
+    timer = setTimeout(() => {
+      el.classList.remove("pressing");
+      action();
+    }, 600);
+  });
+  for (const type of ["pointerup", "pointercancel", "pointerleave"]) {
+    el.addEventListener(type, () => {
+      el.classList.remove("pressing");
+      clearTimeout(timer);
+    });
+  }
+}
+
+onLongPress(unlockButton, () => {
+  locked = false;
+  unlockButton.hidden = true;
+  toolbar.hidden = false;
 });
 
 function showDebug() {
@@ -353,16 +409,10 @@ function showDebug() {
   ].join("\n");
 }
 
-let pressTimer = null;
-versionEl.addEventListener("pointerdown", () => {
-  pressTimer = setTimeout(() => {
-    debugEl.hidden = !debugEl.hidden;
-    if (!debugEl.hidden) showDebug();
-  }, 600);
+onLongPress(versionEl, () => {
+  debugEl.hidden = !debugEl.hidden;
+  if (!debugEl.hidden) showDebug();
 });
-for (const type of ["pointerup", "pointercancel", "pointerleave"]) {
-  versionEl.addEventListener(type, () => clearTimeout(pressTimer));
-}
 </script>
 </body>
 </html>
