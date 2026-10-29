@@ -47,6 +47,27 @@
     font-size: 17px;
   }
   #message:empty { display: none; }
+  #overlay {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  #pick {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    transform: translateX(-50%);
+    min-height: 44px;
+    padding: 12px 24px;
+    border: 0;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #000;
+    font: inherit;
+    font-size: 17px;
+  }
   #version {
     position: fixed;
     top: calc(env(safe-area-inset-top) + 4px);
@@ -70,11 +91,14 @@
 </head>
 <body>
 <video id="video" playsinline muted autoplay></video>
+<canvas id="overlay" hidden></canvas>
+<button id="pick" hidden>Choose image</button>
+<input id="file" type="file" accept="image/*" hidden>
 <div id="start">
   <button id="startButton">Start camera</button>
   <div id="message"></div>
 </div>
-<div id="version">v0.1.0</div>
+<div id="version">v0.2.0</div>
 <div id="debug" hidden></div>
 <script>
 const video = document.getElementById("video");
@@ -121,6 +145,7 @@ async function startCamera() {
   video.srcObject = stream;
   video.play().catch(() => {});
   startScreen.hidden = true;
+  pickButton.hidden = false;
   if (!debugEl.hidden) showDebug();
 }
 
@@ -139,6 +164,52 @@ document.getElementById("startButton").addEventListener("click", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) stopCamera();
   else if (wantCamera && !stream) startCamera();
+});
+
+const overlay = document.getElementById("overlay");
+const pickButton = document.getElementById("pick");
+const fileInput = document.getElementById("file");
+const MAX_SIDE = 2048;
+// x, y: viewport position of the image center.
+const state = { x: 0, y: 0, scale: 1, opacity: 0.5 };
+
+function applyTransform() {
+  overlay.style.opacity = state.opacity;
+  overlay.style.transform =
+    `translate(${state.x}px, ${state.y}px) scale(${state.scale}) ` +
+    `translate(${-overlay.width / 2}px, ${-overlay.height / 2}px)`;
+}
+
+pickButton.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.src = url;
+  try {
+    await img.decode();
+  } catch {
+    URL.revokeObjectURL(url);
+    alert("Could not open that image.");
+    return;
+  }
+  // Safari applies EXIF orientation to naturalWidth/Height and to drawImage.
+  const ratio = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  overlay.width = Math.round(img.naturalWidth * ratio);
+  overlay.height = Math.round(img.naturalHeight * ratio);
+  const ctx = overlay.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, overlay.width, overlay.height);
+  URL.revokeObjectURL(url);
+
+  state.x = window.innerWidth / 2;
+  state.y = window.innerHeight / 2;
+  state.scale = window.innerWidth / overlay.width;
+  applyTransform();
+  overlay.hidden = false;
 });
 
 function showDebug() {
