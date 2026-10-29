@@ -18,15 +18,161 @@
     -webkit-touch-callout: none;
     touch-action: none;
   }
+  video {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #start {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 24px;
+    text-align: center;
+  }
+  #start button {
+    min-height: 44px;
+    padding: 12px 28px;
+    border: 0;
+    border-radius: 12px;
+    background: #fff;
+    color: #000;
+    font: inherit;
+    font-size: 17px;
+  }
+  #message:empty { display: none; }
   #version {
     position: fixed;
     top: calc(env(safe-area-inset-top) + 4px);
-    right: calc(env(safe-area-inset-right) + 8px);
+    right: calc(env(safe-area-inset-right) + 4px);
+    padding: 8px;
     opacity: 0.6;
   }
+  #debug {
+    position: fixed;
+    left: calc(env(safe-area-inset-left) + 8px);
+    right: calc(env(safe-area-inset-right) + 8px);
+    bottom: calc(env(safe-area-inset-bottom) + 8px);
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    font: 11px ui-monospace, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<div id="version">v0.0.1</div>
+<video id="video" playsinline muted autoplay></video>
+<div id="start">
+  <button id="startButton">Start camera</button>
+  <div id="message"></div>
+</div>
+<div id="version">v0.1.0</div>
+<div id="debug" hidden></div>
+<script>
+const video = document.getElementById("video");
+const startScreen = document.getElementById("start");
+const message = document.getElementById("message");
+const versionEl = document.getElementById("version");
+const debugEl = document.getElementById("debug");
+
+let stream = null;
+let wantCamera = false;
+let starting = false;
+
+async function startCamera() {
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    message.textContent = "Camera needs a secure (HTTPS) page. Open the GitHub Pages URL.";
+    return;
+  }
+  if (starting) return;
+  starting = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+  } catch (err) {
+    starting = false;
+    wantCamera = false;
+    startScreen.hidden = false;
+    if (err.name === "NotAllowedError") {
+      message.textContent = "Camera permission denied. Allow it in Settings > Apps > Safari > Camera, or tap aA in the address bar > Website Settings, then reload.";
+    } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+      message.textContent = "No camera found.";
+    } else {
+      message.textContent = "Camera error: " + err.name + " " + err.message;
+    }
+    return;
+  }
+  starting = false;
+  // The page may have been hidden while the permission prompt was open.
+  if (!wantCamera || document.hidden) {
+    stopCamera();
+    return;
+  }
+  video.srcObject = stream;
+  video.play().catch(() => {});
+  startScreen.hidden = true;
+  if (!debugEl.hidden) showDebug();
+}
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null;
+  video.srcObject = null;
+}
+
+document.getElementById("startButton").addEventListener("click", () => {
+  wantCamera = true;
+  message.textContent = "";
+  startCamera();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopCamera();
+  else if (wantCamera && !stream) startCamera();
+});
+
+function showDebug() {
+  const track = stream && stream.getVideoTracks()[0];
+  let caps = "camera not started";
+  let torch = "n/a";
+  if (track) {
+    if (typeof track.getCapabilities === "function") {
+      const c = track.getCapabilities();
+      caps = Object.keys(c).join(", ");
+      torch = "torch" in c ? "yes" : "no";
+    } else {
+      caps = "getCapabilities not supported";
+    }
+  }
+  debugEl.textContent = [
+    "UA: " + navigator.userAgent,
+    "mediaDevices: " + ("mediaDevices" in navigator),
+    "capabilities: " + caps,
+    "torch: " + torch,
+    "wakeLock: " + ("wakeLock" in navigator),
+  ].join("\n");
+}
+
+let pressTimer = null;
+versionEl.addEventListener("pointerdown", () => {
+  pressTimer = setTimeout(() => {
+    debugEl.hidden = !debugEl.hidden;
+    if (!debugEl.hidden) showDebug();
+  }, 600);
+});
+for (const type of ["pointerup", "pointercancel", "pointerleave"]) {
+  versionEl.addEventListener(type, () => clearTimeout(pressTimer));
+}
+</script>
 </body>
 </html>
