@@ -1,9 +1,20 @@
 <!doctype html>
+<!--
+  Lili Projector: trace an image onto paper with the iPhone camera.
+  Rear camera fills the screen; a photo from your library sits on top as a
+  semi-transparent overlay you can drag, pinch, rotate, flip and lock.
+  One file, no dependencies, no network after load. Hosted on GitHub Pages.
+  Target: Safari on iOS (tab or Add to Home Screen).
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-title" content="Lili Projector">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#08090a">
 <title>Lili Projector</title>
 <style>
   /* Look loosely modelled on Linear: dark glass surfaces, hairline borders, indigo accent. */
@@ -291,7 +302,7 @@
   <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Hold to unlock</span>
 </button>
 <div id="notice" class="surface"></div>
-<div id="version">v0.8.0</div>
+<div id="version">v1.0.0</div>
 <div id="debug" class="surface" hidden></div>
 <script>
 const video = document.getElementById("video");
