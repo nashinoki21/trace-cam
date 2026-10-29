@@ -3,7 +3,7 @@
   Lili Projector: trace an image onto paper with the iPhone camera.
   Rear camera fills the screen; a photo from your library sits on top as a
   semi-transparent overlay you can drag, pinch, rotate, flip and lock.
-  One file plus its Home Screen icon (apple-touch-icon.png), no dependencies,
+  One page plus two icons (icon.png, apple-touch-icon.png), no dependencies,
   no network after load. Hosted on GitHub Pages.
   Target: Safari on iOS (tab or Add to Home Screen).
 -->
@@ -75,6 +75,10 @@
     padding: 0 32px;
     text-align: center;
     background: radial-gradient(ellipse at 50% 35%, rgba(94, 106, 210, 0.18), transparent 60%);
+  }
+  #appIcon {
+    margin-bottom: 12px;
+    filter: drop-shadow(0 8px 24px rgba(94, 106, 210, 0.35));
   }
   #start h1 {
     margin: 0;
@@ -300,6 +304,7 @@
 </div>
 <input id="file" type="file" accept="image/*" hidden>
 <div id="start">
+  <img id="appIcon" src="icon.png" alt="" width="96" height="96">
   <h1>Lili Projector</h1>
   <p>Trace any image onto paper.</p>
   <button id="startButton">Start camera</button>
@@ -309,7 +314,7 @@
   <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Hold to unlock</span>
 </button>
 <div id="notice" class="surface"></div>
-<div id="version">v1.1.0</div>
+<div id="version">v1.1.1</div>
 <div id="debug" class="surface" hidden></div>
 <script>
 const video = document.getElementById("video");
