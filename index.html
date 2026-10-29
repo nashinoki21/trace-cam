@@ -193,6 +193,11 @@
     stroke-linejoin: round;
   }
   #toolbar button:disabled, #opacity:disabled { opacity: 0.35; }
+  #toolbar button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
   #version {
     position: fixed;
     top: calc(env(safe-area-inset-top) + 4px);
@@ -288,8 +293,8 @@
     <button id="lock" disabled>
       <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Lock
     </button>
-    <button id="snap">
-      <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Snap
+    <button id="torch" aria-pressed="false">
+      <svg viewBox="0 0 24 24"><path d="M7 3h10v4l-3 4v10h-4V11L7 7z"/><path d="M12 14v2"/></svg>Torch
     </button>
   </div>
 </div>
@@ -304,7 +309,7 @@
   <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Hold to unlock</span>
 </button>
 <div id="notice" class="surface"></div>
-<div id="version">v1.0.2</div>
+<div id="version">v1.1.0</div>
 <div id="debug" class="surface" hidden></div>
 <script>
 const video = document.getElementById("video");
@@ -354,6 +359,7 @@ async function startCamera() {
   toolbar.hidden = false;
   if (!debugEl.hidden) showDebug();
   requestWakeLock();
+  if (torchOn) setTorch(true);
 }
 
 // Safari releases the wake lock whenever the page is hidden, and startCamera
@@ -545,39 +551,30 @@ lockButton.addEventListener("click", () => {
   unlockButton.hidden = false;
 });
 
-// Snapshot: the full camera frame at its native resolution, without the overlay.
-document.getElementById("snap").addEventListener("click", () => {
-  const w = video.videoWidth;
-  const h = video.videoHeight;
-  if (!w || !h) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+// Torch support comes from the camera track, not the page: check getCapabilities() first.
+const torchButton = document.getElementById("torch");
+let torchOn = false;
 
-  const name = "trace-" + Date.now() + ".png";
-  const canShareFiles = !!navigator.canShare &&
-    navigator.canShare({ files: [new File([""], name, { type: "image/png" })] });
-  // Popups must open during the tap itself, before any await.
-  const tab = canShareFiles ? null : window.open("", "_blank");
-
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      notice.textContent = "Snapshot failed.";
-      if (tab) tab.close();
-      return;
-    }
-    if (tab) {
-      tab.location.href = URL.createObjectURL(blob);
-      return;
-    }
+async function setTorch(on) {
+  const track = stream && stream.getVideoTracks()[0];
+  if (!track) return;
+  const caps = typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
+  if (!caps.torch) {
+    notice.textContent = "Torch not available on this camera.";
+    on = false;
+  } else {
     try {
-      await navigator.share({ files: [new File([blob], name, { type: "image/png" })] });
+      await track.applyConstraints({ advanced: [{ torch: on }] });
     } catch (err) {
-      if (err.name !== "AbortError") notice.textContent = "Share failed (" + err.name + ").";
+      notice.textContent = "Torch failed (" + err.name + ").";
+      on = false;
     }
-  }, "image/png");
-});
+  }
+  torchOn = on;
+  torchButton.setAttribute("aria-pressed", String(on));
+}
+
+torchButton.addEventListener("click", () => setTorch(!torchOn));
 
 function onLongPress(el, action) {
   let timer = null;
